@@ -75,29 +75,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.email
 
-class Supplier(models.Model):
-    """Model to track product suppliers"""
-    name = models.CharField(max_length=255)
-    contact_person = models.CharField(max_length=255, blank=True, null=True)
-    email = models.EmailField(blank=True, null=True)
-    phone = models.CharField(max_length=20)
-    address = models.TextField(blank=True, null=True)
-    tax_id = models.CharField(max_length=50, blank=True, null=True)
-    payment_terms = models.TextField(blank=True, null=True)
-    notes = models.TextField(blank=True, null=True)
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        ordering = ['name']
-        verbose_name = 'Supplier'
-        verbose_name_plural = 'Suppliers'
-
-
 class Shop(models.Model):
     name = models.CharField(max_length=255)
     address = models.TextField()
@@ -117,6 +94,39 @@ class Branch(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.shop.name})"
+
+class Supplier(models.Model):
+    """Model to track product suppliers"""
+    name = models.CharField(max_length=255)
+    contact_person = models.CharField(max_length=255, blank=True, null=True)
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=20)
+    address = models.TextField(blank=True, null=True)
+    tax_id = models.CharField(max_length=50, blank=True, null=True)
+    payment_terms = models.TextField(blank=True, null=True)
+    notes = models.TextField(blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    branch = models.ForeignKey(
+        Branch,
+        on_delete=models.CASCADE,
+        related_name='suppliers',
+        null=True,
+        blank=True
+    )
+
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = 'Supplier'
+        verbose_name_plural = 'Suppliers'
+        unique_together = ('name', 'branch')  # Ensure supplier names are unique per branch
+
+
 
 # Customer Profile
 class CustomerProfile(models.Model):
@@ -535,6 +545,7 @@ class PurchaseOrder(models.Model):
 
     po_number = models.CharField(max_length=50, unique=True)
     supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name='orders')
+    branch = models.ForeignKey(Branch, on_delete=models.PROTECT)
     order_date = models.DateField()
     expected_delivery_date = models.DateField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
@@ -565,9 +576,9 @@ class PurchaseOrder(models.Model):
 
 
 class PurchaseOrderItem(models.Model):
-    """Items included in a purchase order"""
     order = models.ForeignKey(PurchaseOrder, on_delete=models.CASCADE, related_name='items')
     product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    branch = models.ForeignKey(Branch, on_delete=models.PROTECT)  # Add this line
     quantity = models.PositiveIntegerField()
     cost_price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Per unit cost price")
     received_quantity = models.PositiveIntegerField(default=0)
@@ -674,3 +685,22 @@ class DeliveryItem(models.Model):
         verbose_name = 'Delivery Item'
         verbose_name_plural = 'Delivery Items'
 
+
+
+class Company(models.Model):
+    # Basic company information
+    name = models.CharField(max_length=200, unique=True)
+    email = models.EmailField(blank=True, null=True)
+    phone = models.CharField(max_length=20)
+    address = models.CharField(max_length=200)
+    city = models.CharField(max_length=100)
+    country = models.CharField(max_length=100, default="Zimbabwe")
+    website = models.URLField(blank=True, null=True)
+    logo = models.ImageField(upload_to='company_logos/', blank=True, null=True)
+
+    # Meta information
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.name

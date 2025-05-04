@@ -193,8 +193,8 @@ class SaleItemAdmin(admin.ModelAdmin):
 
 # # Register all models
 admin.site.register(Supplier)
-# admin.site.register(PurchaseOrder, PurchaseOrderAdmin)
-# admin.site.register(Delivery, DeliveryAdmin)
+admin.site.register(PurchaseOrder, PurchaseOrderAdmin)
+admin.site.register(Delivery, DeliveryAdmin)
 # admin.site.register(ProductBatch, ProductBatchAdmin)
 # admin.site.register(SaleItem, SaleItemAdmin)
 
@@ -210,3 +210,20 @@ class PurchaseOrderItemAdmin(admin.ModelAdmin):
 class DeliveryItemAdmin(admin.ModelAdmin):
     list_display = ('id', 'delivery', 'product', 'quantity', 'cost_price', 'batch_number')
     list_select_related = ('delivery', 'product')
+
+@admin.register(Company)
+class CompanyAdmin(admin.ModelAdmin):
+    list_display = ('name', 'email', 'phone', 'city', 'country')
+    list_filter = ('country',)
+    search_fields = ('name', 'email', 'phone', 'city')
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'email', 'phone')
+        }),
+        ('Address Information', {
+            'fields': ('address', 'city', 'country')
+        }),
+        ('Additional Information', {
+            'fields': ('website', 'logo')
+        }),
+    )
