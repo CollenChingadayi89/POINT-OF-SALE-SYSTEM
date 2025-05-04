@@ -1,10 +1,15 @@
 from locale import currency
+from rest_framework import generics
 from django.shortcuts import render
 from django.http import JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from .serializers import *
+# from django.shortcuts import get_object_or_404
 from Authentication.models import *
+
+from rest_framework.decorators import api_view, permission_classes
+
 from rest_framework.decorators import api_view
 from rest_framework import status
 from django.db import transaction
@@ -32,6 +37,29 @@ from io import BytesIO
 from django.core.files import File
 from rest_framework.generics import ListAPIView
 from .barcode_utils import generate_barcode_base, generate_barcode_image
+from rest_framework import viewsets, status
+from rest_framework.decorators import action  # Add this import
+from rest_framework.response import Response
+from django.shortcuts import get_object_or_404
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+import io
+from django.conf import settings
+import os
+from datetime import datetime
+# from .models import PurchaseOrder, PurchaseOrderItem, CashierProfile, Company
+from .serializers import PurchaseOrderSerializer, PurchaseOrderItemSerializer
+from django.http import JsonResponse, HttpResponse
+from django.shortcuts import get_object_or_404
+# from .models import PurchaseOrder, PurchaseOrderItem, Supplier, Product, CashierProfile
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+import io
+import json
+from django.views.decorators.csrf import csrf_exempt
+from django.db import transaction
+
 
 class CategoryList(ListAPIView):
     queryset = ProductCategory.objects.all()
@@ -171,19 +199,6 @@ class ProductCreateAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# @api_view(['GET'])
-# def get_pharmacy_medicines(request, firebase_user_id):
-#     try:
-#         cashier = CashierProfile.objects.get(user__firebase_user_id=firebase_user_id)
-#         cashier_branch = cashier.cashier_branch
-#         products = Product.objects.filter(Branch=cashier_branch)
-#         data = [{"name": med.name,"price": med.price ,"stock": med.stock ,"description": med.description } for med in medicines]
-#         print(data)
-#         return Response(data, status=200)
-#     except Phamarcist.DoesNotExist:
-#         return Response({"error": "Pharmacist not found"}, status=404)
-#     except Exception as e:
-#         return Response({"error": str(e)}, status=500)
 
 class ProductCategoryListAPIView(APIView):
     def get(self, request, format=None):
@@ -441,65 +456,7 @@ def transfer_stock(request, product_id):
         return Response({"error": "Branch not found"}, status=404)
     except Exception as e:
         return Response({"error": str(e)}, status=500)
-# @api_view(['POST'])
-# def transfer_stock(request, product_id):
-#     try:
-#         product = Product.objects.get(id=product_id)
-#         target_branch_id = request.data.get('target_branch')
-#         quantity = int(request.data.get('quantity', 0))
-#         firebase_id = request.data.get('firebaseId')
 
-#         cashier = CashierProfile.objects.get(firebase_user = firebase_id)
-#         from_branch = cashier.cashier_branch
-        
-#         from_branch_stock = Product.objects.get(branch = from_branch )
-
-#         from_trans_product = Product.objects.get(id=product_id)
-#         from_trans_product.stock_quantity -= quantity
-
-#         if quantity <= 0:
-#             return Response({"error": "Invalid quantity"}, status=400)
-            
-#         if product.stock_quantity < quantity:
-#             return Response({"error": "Not enough stock available"}, status=400)
-            
-#         # Find or create the product in target branch
-#         target_product, created = Product.objects.get_or_create(
-#             barcode=product.barcode,
-#             branch_id=target_branch_id,
-#             defaults={
-#                 'name': product.name,
-#                 'price': product.price,
-#                 'description': product.description,
-#                 'category': product.category,
-#                 'stock_quantity': 0
-#             }
-#         )
-        
-#         # Update quantities
-#         product.stock_quantity -= quantity
-#         target_product.stock_quantity += quantity
-        
-#         product.save()
-#         target_product.save()
-        
-#         return Response({
-#             "message": "Stock transferred successfully",
-#             "source_stock": product.stock_quantity,
-#             "target_stock": target_product.stock_quantity
-#         })
-        
-#     except Product.DoesNotExist:
-#         return Response({"error": "Product not found"}, status=404)
-#     except Exception as e:
-#         return Response({"error": str(e)}, status=500)
-    
-
-
-# -----------------------------------------------------------------------------------
-
-# views.py
-# views.py
 @api_view(['PUT'])
 def update_product(request, id):
     try:
@@ -654,3 +611,332 @@ def low_stock_products(request, firebase_id):
         return Response({'error': 'Cashier not found'}, status=404)
     except Exception as e:
         return Response({'error': str(e)}, status=400)
+
+
+
+class CompanyDetailAPIView(generics.RetrieveAPIView):
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+
+    def get_object(self):
+        # Return the first company (assuming single company setup)
+        return self.get_queryset().first()
+
+
+# views.py
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from django.shortcuts import get_object_or_404
+
+from .serializers import SupplierSerializer, BranchSerializer
+from django.contrib.auth import get_user_model
+import json
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_suppliers(request, firebase_id):
+    try:
+        print('IM HERE')
+        user = CashierProfile.objects.get(firebase_user=firebase_id)  # Changed to firebase_user
+        if not user.cashier_branch:  # Changed to cashier_branch
+            return JsonResponse({'error': 'User not assigned to a branch'}, status=400)
+
+        suppliers = Supplier.objects.filter(branch=user.cashier_branch)  # Changed to cashier_branch
+        serializer = SupplierSerializer(suppliers, many=True)
+        print("serializer")
+        return JsonResponse({'suppliers': serializer.data}, status=200)
+
+    except CashierProfile.DoesNotExist:  # Changed exception type
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def create_supplier(request, firebase_id):
+    try:
+        user = CashierProfile.objects.get(firebase_user=firebase_id)  # Changed to firebase_user
+        if not user.cashier_branch:  # Changed to cashier_branch
+            return JsonResponse({'error': 'User not assigned to a branch'}, status=400)
+
+        data = json.loads(request.body)
+        data['branch_id'] = user.cashier_branch.id  # Changed to cashier_branch
+
+        serializer = SupplierSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse({
+                'message': 'Supplier created successfully',
+                'supplier': serializer.data
+            }, status=201)
+        return JsonResponse({'error': serializer.errors}, status=400)
+
+    except CashierProfile.DoesNotExist:  # Changed exception type
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["PUT"])
+def update_supplier(request, firebase_id, supplier_id):
+    try:
+        user = CashierProfile.objects.get(firebase_user=firebase_id)  # Changed to firebase_user
+        supplier = get_object_or_404(Supplier, id=supplier_id)
+
+        # Verify supplier belongs to user's branch
+        if supplier.branch != user.cashier_branch:  # Changed to cashier_branch
+            return JsonResponse({'error': 'You can only update suppliers from your branch'}, status=403)
+
+        data = json.loads(request.body)
+        # Ensure branch can't be changed
+        if 'branch_id' in data:
+            del data['branch_id']
+
+        serializer = SupplierSerializer(supplier, data=data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse({
+                'message': 'Supplier updated successfully',
+                'supplier': serializer.data
+            }, status=200)
+        return JsonResponse({'error': serializer.errors}, status=400)
+
+    except CashierProfile.DoesNotExist:  # Changed exception type
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["GET"])
+def get_branches(request, firebase_id):
+    try:
+        user = CashierProfile.objects.get(firebase_user=firebase_id)  # Changed to firebase_user
+
+        # For non-manager users, only return their branch
+        if not user.is_manager:  # Changed to is_manager
+            branches = Branch.objects.filter(id=user.cashier_branch.id)  # Changed to cashier_branch
+        else:
+            branches = Branch.objects.all()
+
+        serializer = BranchSerializer(branches, many=True)
+        return JsonResponse({'branches': serializer.data}, status=200)
+
+    except CashierProfile.DoesNotExist:  # Changed exception type
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def get_purchase_orders(request, firebase_id):
+    try:
+        cashier_profile = CashierProfile.objects.get(firebase_user=firebase_id)
+        orders = PurchaseOrder.objects.filter(branch=cashier_profile.cashier_branch).order_by('-order_date')
+
+        orders_data = []
+        for order in orders:
+            order_data = {
+                'id': order.id,
+                'po_number': order.po_number,
+                'supplier': order.supplier.name,
+                'order_date': order.order_date.strftime('%Y-%m-%d'),
+                'status': order.status,
+                'total_cost': sum(item.total_cost for item in order.items.all())
+            }
+            orders_data.append(order_data)
+
+        return JsonResponse(orders_data, safe=False, status=200)
+
+    except CashierProfile.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@transaction.atomic
+def create_purchase_order(request, firebase_id):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            cashier_profile = CashierProfile.objects.get(firebase_user=firebase_id)
+
+            order = PurchaseOrder.objects.create(
+                supplier_id=data['supplier_id'],
+                branch=cashier_profile.cashier_branch,
+                order_date=data['order_date'],
+                expected_delivery_date=data.get('expected_delivery_date'),
+                status='draft',
+                notes=data.get('notes', ''),
+                created_by=cashier_profile.user
+            )
+
+            for item_data in data['items']:
+                PurchaseOrderItem.objects.create(
+                    order=order,
+                    product_id=item_data['product_id'],
+                    branch=cashier_profile.cashier_branch,  # Add this line
+                    quantity=item_data['quantity'],
+                    cost_price=item_data['cost_price']
+                )
+
+            return JsonResponse({
+                'id': order.id,
+                'po_number': order.po_number,
+                'message': 'Purchase order created successfully'
+            }, status=201)
+
+        except CashierProfile.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def get_purchase_order_detail(request, pk, firebase_id):
+    try:
+        cashier_profile = CashierProfile.objects.get(firebase_user=firebase_id)
+        order = get_object_or_404(PurchaseOrder, pk=pk, branch=cashier_profile.cashier_branch)
+
+        order_data = {
+            'id': order.id,
+            'po_number': order.po_number,
+            'supplier_id': order.supplier.id,
+            'order_date': order.order_date.strftime('%Y-%m-%d'),
+            'expected_delivery_date': order.expected_delivery_date.strftime(
+                '%Y-%m-%d') if order.expected_delivery_date else None,
+            'status': order.status,
+            'notes': order.notes,
+            'items': [
+                {
+                    'id': item.id,
+                    'product_id': item.product.id,
+                    'product_name': item.product.name,
+                    'quantity': item.quantity,
+                    'cost_price': float(item.cost_price),
+                    'total': float(item.total_cost)
+                } for item in order.items.all()
+            ]
+        }
+
+        return JsonResponse(order_data, status=200)
+
+    except CashierProfile.DoesNotExist:
+        return JsonResponse({'error': 'User not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def delete_purchase_order(request, pk, firebase_id):
+    if request.method == 'DELETE':
+        try:
+            cashier_profile = CashierProfile.objects.get(firebase_user=firebase_id)
+            order = get_object_or_404(PurchaseOrder, pk=pk, branch=cashier_profile.cashier_branch)
+            order.delete()
+            return JsonResponse({'message': 'Purchase order deleted successfully'}, status=200)
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+def generate_purchase_order_pdf(request, pk, firebase_id):
+    try:
+        cashier_profile = CashierProfile.objects.get(firebase_user=firebase_id)
+        order = get_object_or_404(PurchaseOrder, pk=pk, branch=cashier_profile.cashier_branch)
+
+        template = get_template('purchase_order_pdf.html')
+        context = {
+            'order': order,
+            'items': order.items.all(),
+            'total': sum(item.total_cost for item in order.items.all())
+        }
+
+        html = template.render(context)
+        result = io.BytesIO()
+        pdf = pisa.pisaDocument(io.StringIO(html), result)
+
+        if not pdf.err:
+            response = HttpResponse(result.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'filename=PO_{order.po_number}.pdf'
+            return response
+        return HttpResponse('Error generating PDF', status=500)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@api_view(['PUT'])
+@transaction.atomic
+def update_purchase_order(request, po_id, firebase_id):
+    try:
+        # Get the cashier profile first
+        cashier_profile = CashierProfile.objects.get(firebase_user=firebase_id)
+        branch = cashier_profile.cashier_branch
+
+        # Get the purchase order with prefetched items
+        purchase_order = PurchaseOrder.objects.prefetch_related('items').get(
+            id=po_id,
+            branch=branch  # Ensure order belongs to this branch
+        )
+
+        # Prepare the data with the branch_id for validation
+        data = request.data.copy()
+        if isinstance(data, dict):
+            data['branch_id'] = branch.id
+
+        serializer = PurchaseOrderSerializer(
+            instance=purchase_order,
+            data=data,
+            context={
+                'request': request,
+                'firebase_id': firebase_id,
+                'branch': branch
+            }
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    except CashierProfile.DoesNotExist:
+        return Response(
+            {'error': 'Cashier profile not found'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    except PurchaseOrder.DoesNotExist:
+        return Response(
+            {'error': 'Purchase order not found in your branch'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+@csrf_exempt
+def get_suppliers(request, firebase_id):
+    try:
+        cashier_profile = CashierProfile.objects.get(firebase_user=firebase_id)
+        suppliers = Supplier.objects.filter(branch=cashier_profile.cashier_branch).values('id', 'name')
+        return JsonResponse(list(suppliers), safe=False, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@csrf_exempt
+def get_products(request, firebase_id):
+    try:
+        cashier_profile = CashierProfile.objects.get(firebase_user=firebase_id)
+        products = Product.objects.filter(branch=cashier_profile.cashier_branch).values('id', 'name', 'cost_price')
+        return JsonResponse(list(products), safe=False, status=200)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)

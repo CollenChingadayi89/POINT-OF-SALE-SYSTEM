@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Purchase Order {{ purchase_order.po_number }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+        .company-info { width: 50%; }
+        .po-info { width: 40%; text-align: right; }
+        h1 { color: #333; margin-top: 0; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .total { text-align: right; font-weight: bold; margin-top: 10px; }
+        .footer { margin-top: 50px; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-info">
+            <h1>Your Company Name</h1>
+            <p>123 Business Street<br>
+            City, Country<br>
+            Phone: (123) 456-7890<br>
+            Email: info@company.com</p>
+        </div>
+        <div class="po-info">
+            <h2>PURCHASE ORDER</h2>
+            <p><strong>PO Number:</strong> {{ purchase_order.po_number }}</p>
+            <p><strong>Date:</strong> {{ purchase_order.order_date|date:"Y-m-d" }}</p>
+            <p><strong>Branch:</strong> {{ purchase_order.branch.name }}</p>
+        </div>
+    </div>
+
+    <div class="supplier-info">
+        <h3>Supplier:</h3>
+        <p>{{ purchase_order.supplier.name }}<br>
+        {{ purchase_order.supplier.contact_person }}<br>
+        {{ purchase_order.supplier.phone }}<br>
+        {{ purchase_order.supplier.email }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.product.name }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>${{ item.cost_price }}</td>
+                <td>${{ item.total_cost }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="total">
+        <p><strong>Total: ${{ total_cost }}</strong></p>
+    </div>
+
+    <div class="footer">
+        <p>Expected Delivery Date: {{ purchase_order.expected_delivery_date|date:"Y-m-d" }}</p>
+        <p>Notes: {{ purchase_order.notes }}</p>
+    </div>
+</body>
+</html>

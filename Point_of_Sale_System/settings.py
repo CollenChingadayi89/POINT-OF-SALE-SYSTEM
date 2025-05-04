@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os
+from config import Django_Secrets, Allowed_origins, Server_Url, Database_configs
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -21,19 +22,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-lo6zwe^$8qfdme5v&zeg3le(4ps+54b7*frt8uon+jhj6#=q=e"
+# SECRET_KEY = "django-insecure-lo6zwe^$8qfdme5v&zeg3le(4ps+54b7*frt8uon+jhj6#=q=e"
+
+secret_key = Django_Secrets()
+SECRET_KEY = secret_key.key
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['192.168.1.227', '*']
+server_Url = Server_Url()
+ALLOWED_HOSTS = server_Url.allowed_hosts
+
+# ALLOWED_HOSTS = ['192.168.1.227', '*']
 
 CORS_ALLOW_ALL_ORIGINS = True  # Development only
-CORS_ALLOWED_ORIGINS = [
 
-    "http://localhost:8083",
+crs_allowed_org = Allowed_origins()
+CORS_ALLOWED_ORIGINS=crs_allowed_org.allowed_origins
 
-]
+# CORS_ALLOWED_ORIGINS = [
+#
+#     "http://localhost:8083",
+#
+# ]
 
 
 # Application definition
@@ -67,7 +78,7 @@ ROOT_URLCONF = "Point_of_Sale_System.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / 'templates'],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -87,16 +98,19 @@ AUTH_USER_MODEL = 'Authentication.CustomUser'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'Point_of_Sale_DB',
-        'USER': 'postgres',
-        'PASSWORD': 'c011en89',
-        'HOST': 'localhost',
-        'PORT': '5432',
-    }
-}
+db_config = Database_configs()
+DATABASES = db_config.test
+
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'Point_of_Sale_DB',
+#         'USER': 'postgres',
+#         'PASSWORD': 'c011en89',
+#         'HOST': 'localhost',
+#         'PORT': '5432',
+#     }
+# }
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
